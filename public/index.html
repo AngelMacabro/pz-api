@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PZ Server Dashboard | Build 42 Dedicated Server</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/terminal.css">
+</head>
+<body>
+  <div id="app-container">
+    <!-- Top Header -->
+    <header class="main-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title">
+            <span>PROJECT ZOMBOID</span>
+            <span class="badge-b42">BUILD 42</span>
+          </div>
+          <span class="brand-subtitle">Local Dedicated Server Manager</span>
+        </div>
+      </div>
+
+      <!-- Live Server Status Indicator -->
+      <div class="header-status">
+        <div class="status-pill" id="global-status-pill">
+          <span class="status-dot"></span>
+          <span class="status-text" id="global-status-text">Comprobando...</span>
+        </div>
+      </div>
+
+      <!-- Resource Metrics -->
+      <div class="header-metrics">
+        <div class="metric-card" title="Uso de CPU del sistema">
+          <span class="metric-label">CPU</span>
+          <div class="metric-bar-wrap">
+            <div class="metric-bar" id="cpu-bar" style="width: 0%"></div>
+          </div>
+          <span class="metric-val" id="cpu-val">0%</span>
+        </div>
+        <div class="metric-card" title="Memoria RAM total del sistema">
+          <span class="metric-label">RAM SISTEMA</span>
+          <div class="metric-bar-wrap">
+            <div class="metric-bar bar-ram" id="ram-bar" style="width: 0%"></div>
+          </div>
+          <span class="metric-val" id="ram-val">0 / 0 GB</span>
+        </div>
+        <div class="metric-card" id="proc-ram-card" title="Memoria RAM del proceso de Project Zomboid">
+          <span class="metric-label">PZ RAM</span>
+          <span class="metric-val highlight-emerald" id="proc-ram-val">0 MB</span>
+        </div>
+      </div>
+
+      <!-- Quick Action Controls -->
+      <div class="header-actions">
+        <button class="btn btn-emerald" id="btn-quick-start">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Iniciar
+        </button>
+        <button class="btn btn-amber" id="btn-quick-restart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Reiniciar
+        </button>
+        <button class="btn btn-crimson" id="btn-quick-stop">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          Detener
+        </button>
+      </div>
+    </header>
+
+    <!-- SteamCMD Progress Notification Banner -->
+    <div class="steam-progress-banner hidden" id="steam-banner">
+      <div class="steam-banner-content">
+        <div class="steam-spinner"></div>
+        <div class="steam-info">
+          <strong id="steam-banner-title">SteamCMD en ejecución...</strong>
+          <span id="steam-banner-status">Descargando archivos...</span>
+        </div>
+        <div class="steam-progress-track">
+          <div class="steam-progress-fill" id="steam-banner-progress" style="width: 0%"></div>
+        </div>
+        <button class="btn btn-sm btn-outline-crimson" id="btn-cancel-steam">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Main App Layout -->
+    <div class="app-body">
+      <!-- Navigation Sidebar -->
+      <aside class="sidebar">
+        <nav class="nav-menu">
+          <button class="nav-item active" data-tab="tab-dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Panel Principal</span>
+          </button>
+          <button class="nav-item" data-tab="tab-console">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            <span>Consola en Vivo</span>
+            <span class="pulse-indicator" id="console-pulse"></span>
+          </button>
+          <button class="nav-item" data-tab="tab-config">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>Configuración</span>
+          </button>
+          <button class="nav-item" data-tab="tab-mods">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><path d="M14 14h7v7h-7z"></path><path d="M10 14H3v7h7z"></path></svg>
+            <span>Gestor de Mods</span>
+            <span class="badge-counter" id="nav-mods-count">0</span>
+          </button>
+          <button class="nav-item" data-tab="tab-files">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span>Editor de Archivos</span>
+          </button>
+          <button class="nav-item" data-tab="tab-tools">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+            <span>Herramientas</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="server-tag">
+            <span class="tag-title">Servidor Activo</span>
+            <span class="tag-name" id="sidebar-server-name">servertest</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Content Area -->
+      <main class="content-area">
+
+        <!-- TAB: DASHBOARD -->
+        <section class="tab-pane active" id="tab-dashboard">
+          <div class="pane-header">
+            <div>
+              <h2>Panel de Control</h2>
+              <p class="text-muted">Estado del servidor, acciones rápidas y estadísticas en tiempo real.</p>
+            </div>
+            <div class="pane-header-actions">
+              <button class="btn btn-cyan" id="btn-install-server">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Instalar Servidor
+              </button>
+              <button class="btn btn-outline-cyan" id="btn-update-server">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                Actualizar Servidor
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert / Error Banner if server has error -->
+          <div class="alert alert-danger hidden" id="server-error-banner">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <div class="alert-content">
+              <strong>Error Detectado:</strong>
+              <span id="server-error-text">Descripción del error...</span>
+            </div>
+          </div>
+
+          <!-- Status Cards Grid -->
+          <div class="cards-grid">
+            <div class="card stat-card">
+              <div class="stat-icon icon-state" id="card-state-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="stat-data">
+                <span class="stat-title">Estado Actual</span>
+                <h3 class="stat-value" id="card-status-text">Detenido</h3>
+                <span class="stat-sub" id="card-status-sub">Listo para iniciar</span>
+              </div>
+            </div>
+
+            <div class="card stat-card">
+              <div class="stat-icon icon-uptime">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 10"></polyline></svg>
+              </div>
+              <div class="stat-data">
+                <span class="stat-title">Tiempo de Actividad</span>
+                <h3 class="stat-value" id="card-uptime-text">00:00:00</h3>
+                <span class="stat-sub" id="card-pid-text">PID: Inactivo</span>
+              </div>
+            </div>
+
+            <div class="card stat-card">
+              <div class="stat-icon icon-mods">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><path d="M14 14h7v7h-7z"></path><path d="M10 14H3v7h7z"></path></svg>
+              </div>
+              <div class="stat-data">
+                <span class="stat-title">Mods & Workshop</span>
+                <h3 class="stat-value" id="card-mods-count">0 Mods</h3>
+                <span class="stat-sub" id="card-workshop-count">0 Workshop Items</span>
+              </div>
+            </div>
+
+            <div class="card stat-card">
+              <div class="stat-icon icon-port">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+              </div>
+              <div class="stat-data">
+                <span class="stat-title">Puertos de Conexión</span>
+                <h3 class="stat-value" id="card-ports-text">16261 / 16262</h3>
+                <span class="stat-sub">UDP Game Ports</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Secondary Grid -->
+          <div class="dashboard-grid-2">
+            <!-- Server Info & Details Card -->
+            <div class="card info-details-card">
+              <div class="card-header">
+                <h3>Información del Servidor</h3>
+                <span class="badge badge-outline">B42 Unstable</span>
+              </div>
+              <div class="card-body info-list">
+                <div class="info-row">
+                  <span class="info-k">Nombre del Servidor:</span>
+                  <span class="info-v" id="dash-server-name">servertest</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-k">Nombre Público:</span>
+                  <span class="info-v" id="dash-public-name">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-k">Asignación de Memoria:</span>
+                  <span class="info-v" id="dash-ram-alloc">2048m - 6144m</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-k">Jugadores Máximos:</span>
+                  <span class="info-v" id="dash-max-players">16</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-k">Ruta del Servidor:</span>
+                  <span class="info-v text-truncate" id="dash-install-dir">-</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-k">Directorio de Datos:</span>
+                  <span class="info-v text-truncate" id="dash-cache-dir">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mini Live Log Stream Preview -->
+            <div class="card log-preview-card">
+              <div class="card-header">
+                <h3>Últimos Eventos de Consola</h3>
+                <button class="btn btn-sm btn-ghost" id="btn-goto-console">Ir a Consola Completa →</button>
+              </div>
+              <div class="card-body mini-terminal" id="mini-terminal-feed">
+                <!-- Live lines injected here -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB: CONSOLE -->
+        <section class="tab-pane" id="tab-console">
+          <div class="pane-header">
+            <div>
+              <h2>Consola del Servidor en Tiempo Real</h2>
+              <p class="text-muted">Salida estándar y control interactivo de comandos.</p>
+            </div>
+            <div class="console-controls">
+              <label class="toggle-control">
+                <input type="checkbox" id="chk-autoscroll" checked>
+                <span>Autoscroll</span>
+              </label>
+              <input type="text" class="input-search" id="input-log-filter" placeholder="Filtrar logs...">
+              <button class="btn btn-sm btn-outline-slate" id="btn-clear-terminal">Limpiar</button>
+              <button class="btn btn-sm btn-outline-cyan" id="btn-download-log">Descargar Log</button>
+            </div>
+          </div>
+
+          <!-- Terminal Container -->
+          <div class="terminal-wrapper">
+            <div class="terminal-body" id="full-terminal-body">
+              <!-- Logs injected here -->
+            </div>
+            
+            <!-- Quick Command Bar -->
+            <div class="terminal-quick-bar">
+              <span class="quick-label">Comandos rápidos:</span>
+              <button class="btn-quick-cmd" data-cmd="save">💾 save</button>
+              <button class="btn-quick-cmd" data-cmd="players">👥 players</button>
+              <button class="btn-quick-cmd" data-cmd="help">❓ help</button>
+              <button class="btn-quick-cmd" data-cmd="reloadoptions">🔄 reloadoptions</button>
+              <button class="btn-quick-cmd" data-cmd="servermsg &quot;¡Hola a todos los supervivientes!&quot;">📢 broadcast</button>
+            </div>
+
+            <!-- Command Input Box -->
+            <div class="terminal-input-bar">
+              <span class="prompt-symbol">&gt;</span>
+              <input type="text" class="terminal-input" id="terminal-cmd-input" placeholder="Escribe un comando de Project Zomboid (ej. save, players, help)..." autocomplete="off">
+              <button class="btn btn-cyan" id="btn-send-cmd">Enviar</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB: CONFIGURATION -->
+        <section class="tab-pane" id="tab-config">
+          <div class="pane-header">
+            <div>
+              <h2>Configuración del Servidor</h2>
+              <p class="text-muted">Ajusta los parámetros principales, hardware, red y rutas de Project Zomboid.</p>
+            </div>
+            <button class="btn btn-emerald" id="btn-save-config">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              Guardar Configuración
+            </button>
+          </div>
+
+          <form id="form-config" class="config-form-layout">
+            <!-- General Settings -->
+            <div class="card config-card">
+              <div class="card-header">
+                <h3>General y Jugabilidad</h3>
+              </div>
+              <div class="card-body form-grid">
+                <div class="form-group">
+                  <label for="cfg-server-name">Nombre del Servidor (Nombre de Archivo)</label>
+                  <input type="text" id="cfg-server-name" name="serverName" required>
+                  <small class="form-hint">Nombre base para los archivos .ini y carpetas de guardado.</small>
+                </div>
+                <div class="form-group">
+                  <label for="cfg-public-name">Nombre Público del Servidor</label>
+                  <input type="text" id="cfg-public-name" name="publicName">
+                  <small class="form-hint">Nombre visible en el explorador de servidores de Steam/PZ.</small>
+                </div>
+                <div class="form-group full-width">
+                  <label for="cfg-public-desc">Descripción Pública</label>
+                  <textarea id="cfg-public-desc" name="publicDescription" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                  <label for="cfg-max-players">Jugadores Máximos</label>
+                  <input type="number" id="cfg-max-players" name="maxPlayers" min="1" max="100">
+                </div>
+                <div class="form-group">
+                  <label for="cfg-server-pwd">Contraseña del Servidor</label>
+                  <input type="password" id="cfg-server-pwd" name="serverPassword" placeholder="Dejar vacío para público">
+                </div>
+                <div class="form-group">
+                  <label for="cfg-admin-pwd">Contraseña de Administrador (RCON / Admin)</label>
+                  <input type="password" id="cfg-admin-pwd" name="adminPassword">
+                </div>
+                <div class="form-group checkbox-group">
+                  <label class="checkbox-item">
+                    <input type="checkbox" id="cfg-open-server" name="openServer">
+                    <span>Servidor Abierto (sin lista blanca obligatoria)</span>
+                  </label>
+                  <label class="checkbox-item">
+                    <input type="checkbox" id="cfg-pvp" name="pvp">
+                    <span>Permitir PvP</span>
+                  </label>
+                  <label class="checkbox-item">
+                    <input type="checkbox" id="cfg-pause-empty" name="pauseEmpty">
+                    <span>Pausar tiempo cuando el servidor esté vacío</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hardware & Network -->
+            <div class="card config-card">
+              <div class="card-header">
+                <h3>Hardware, Memoria y Red</h3>
+              </div>
+              <div class="card-body form-grid">
+                <div class="form-group">
+                  <label for="cfg-min-ram">RAM Mínima (-Xms)</label>
+                  <input type="text" id="cfg-min-ram" name="minRam" placeholder="ej. 2048m o 2G">
+                  <small class="form-hint">Memoria inicial asignada a Java.</small>
+                </div>
+                <div class="form-group">
+                  <label for="cfg-max-ram">RAM Máxima (-Xmx)</label>
+                  <input type="text" id="cfg-max-ram" name="maxRam" placeholder="ej. 6144m o 6G">
+                  <small class="form-hint">Límite superior de memoria RAM.</small>
+                </div>
+                <div class="form-group">
+                  <label for="cfg-default-port">Puerto Principal (DefaultPort)</label>
+                  <input type="number" id="cfg-default-port" name="defaultPort" value="16261">
+                  <small class="form-hint">Puerto UDP 16261 por defecto.</small>
+                </div>
+                <div class="form-group">
+                  <label for="cfg-udp-port">Puerto Directo (UDPPort)</label>
+                  <input type="number" id="cfg-udp-port" name="udpPort" value="16262">
+                  <small class="form-hint">Puerto UDP 16262 por defecto.</small>
+                </div>
+                <div class="form-group full-width">
+                  <label for="cfg-jvm-args">Argumentos Avanzados de JVM Java</label>
+                  <input type="text" id="cfg-jvm-args" name="jvmArgs">
+                </div>
+                <div class="form-group checkbox-group">
+                  <label class="checkbox-item">
+                    <input type="checkbox" id="cfg-upnp" name="upnp">
+                    <span>Habilitar UPnP (Apertura automática de puertos)</span>
+                  </label>
+                  <label class="checkbox-item">
+                    <input type="checkbox" id="cfg-autorestart" name="autoRestartOnCrash">
+                    <span>Reinicio automático si el servidor falla inesperadamente</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Paths & Steam -->
+            <div class="card config-card">
+              <div class="card-header">
+                <h3>Rutas de Instalación y SteamCMD</h3>
+              </div>
+              <div class="card-body form-grid">
+                <div class="form-group full-width">
+                  <label for="cfg-server-dir">Directorio de Instalación del Servidor</label>
+                  <input type="text" id="cfg-server-dir" name="serverInstallDir" required>
+                  <small class="form-hint">Carpeta donde se instalan los archivos del servidor dedicado.</small>
+                </div>
+                <div class="form-group full-width">
+                  <label for="cfg-cache-dir">Directorio de Datos / Caché (-cachedir)</label>
+                  <input type="text" id="cfg-cache-dir" name="cacheDir" required>
+                  <small class="form-hint">Donde se guardan mundos, configuraciones y logs de Zomboid (%USERPROFILE%/Zomboid).</small>
+                </div>
+                <div class="form-group">
+                  <label for="cfg-steamcmd-dir">Directorio de SteamCMD</label>
+                  <input type="text" id="cfg-steamcmd-dir" name="steamCmdDir" required>
+                </div>
+                <div class="form-group">
+                  <label for="cfg-branch">Rama de Steam (-beta)</label>
+                  <input type="text" id="cfg-branch" name="branch" placeholder="unstable o dejar vacío para public">
+                  <small class="form-hint">Para Build 42 utiliza: unstable</small>
+                </div>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <!-- TAB: MODS -->
+        <section class="tab-pane" id="tab-mods">
+          <div class="pane-header">
+            <div>
+              <h2>Gestor de Mods de Steam Workshop</h2>
+              <p class="text-muted">Administra los IDs de Workshop y nombres de Mods sincronizados con tu servidor.</p>
+            </div>
+            <div class="pane-header-actions">
+              <button class="btn btn-outline-cyan" id="btn-download-all-mods">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Descargar Mods con SteamCMD
+              </button>
+              <button class="btn btn-emerald" id="btn-save-mods">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                Sincronizar y Guardar Mods
+              </button>
+            </div>
+          </div>
+
+          <div class="mods-layout">
+            <!-- Smart Importer Card -->
+            <div class="card importer-card">
+              <div class="card-header">
+                <h3>Importador Inteligente de Mods</h3>
+                <span class="badge badge-cyan">Auto-extractor</span>
+              </div>
+              <div class="card-body">
+                <p class="form-hint">Pega aquí el texto de descripciones de mods, colecciones de Steam Workshop o enlaces. El sistema extraerá automáticamente los <strong>Workshop ID</strong> y <strong>Mod ID</strong>.</p>
+                <textarea id="txt-mod-importer" rows="4" placeholder="Ejemplo:
+Workshop ID: 2680473910
+Mod ID: TrueActionsDancing
+https://steamcommunity.com/sharedfiles/filedetails/?id=2460154811
+Mod ID: AutoLoot"></textarea>
+                <button class="btn btn-sm btn-cyan" id="btn-parse-mod-text">Extraer y Añadir a la Lista</button>
+              </div>
+            </div>
+
+            <!-- Mod Lists Grid -->
+            <div class="mods-columns">
+              <!-- Workshop Items -->
+              <div class="card mod-list-card">
+                <div class="card-header">
+                  <div>
+                    <h3>Steam Workshop Items (IDs)</h3>
+                    <span class="text-muted text-sm">WorkshopItems en .ini</span>
+                  </div>
+                  <span class="badge badge-emerald" id="badge-workshop-count">0 items</span>
+                </div>
+                <div class="card-body">
+                  <div class="add-item-bar">
+                    <input type="text" id="input-new-workshop" placeholder="ID numérico (ej. 2680473910)">
+                    <button class="btn btn-sm btn-cyan" id="btn-add-workshop">Añadir</button>
+                  </div>
+                  <div class="tags-container" id="workshop-tags-list">
+                    <!-- Dynamic tag pills -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mod IDs -->
+              <div class="card mod-list-card">
+                <div class="card-header">
+                  <div>
+                    <h3>Mod IDs (Nombres)</h3>
+                    <span class="text-muted text-sm">Mods en .ini</span>
+                  </div>
+                  <span class="badge badge-violet" id="badge-mods-count">0 mods</span>
+                </div>
+                <div class="card-body">
+                  <div class="add-item-bar">
+                    <input type="text" id="input-new-mod" placeholder="Nombre de Mod ID (ej. Vampirism)">
+                    <button class="btn btn-sm btn-violet" id="btn-add-mod">Añadir</button>
+                  </div>
+                  <div class="tags-container" id="mod-tags-list">
+                    <!-- Dynamic tag pills -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB: FILE EDITOR -->
+        <section class="tab-pane" id="tab-files">
+          <div class="pane-header">
+            <div>
+              <h2>Editor de Archivos de Configuración</h2>
+              <p class="text-muted">Edita directamente los archivos .ini y scripts Lua con copia de seguridad automática.</p>
+            </div>
+            <div class="file-actions">
+              <select id="select-config-file" class="select-file-dropdown">
+                <!-- Injected files -->
+              </select>
+              <button class="btn btn-outline-slate" id="btn-reload-file">Recargar</button>
+              <button class="btn btn-emerald" id="btn-save-raw-file">Guardar Cambios</button>
+            </div>
+          </div>
+
+          <div class="file-editor-card card">
+            <div class="file-editor-header">
+              <span class="file-path-display" id="editor-active-filepath">-</span>
+              <span class="badge badge-outline" id="editor-file-status">Listo</span>
+            </div>
+            <div class="editor-container">
+              <textarea id="raw-file-content" spellcheck="false" placeholder="Cargando archivo..."></textarea>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB: TOOLS -->
+        <section class="tab-pane" id="tab-tools">
+          <div class="pane-header">
+            <div>
+              <h2>Herramientas y Diagnóstico</h2>
+              <p class="text-muted">Mantenimiento de SteamCMD, verificación de integridad y utilidades del sistema.</p>
+            </div>
+          </div>
+
+          <div class="tools-grid">
+            <div class="card tool-card">
+              <div class="tool-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              </div>
+              <div class="tool-details">
+                <h3>Validar Integridad de Archivos</h3>
+                <p>Ejecuta una comprobación y reparación de archivos del servidor dedicado mediante SteamCMD validate.</p>
+                <button class="btn btn-outline-cyan" id="btn-tool-validate">Validar Archivos</button>
+              </div>
+            </div>
+
+            <div class="card tool-card">
+              <div class="tool-icon icon-danger">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              </div>
+              <div class="tool-details">
+                <h3>Forzar Cierre de Emergencia</h3>
+                <p>Termina inmediatamente todos los procesos Java del servidor si se queda congelado.</p>
+                <button class="btn btn-outline-crimson" id="btn-tool-kill">Terminar Proceso Forzosamente</button>
+              </div>
+            </div>
+
+            <div class="card tool-card">
+              <div class="tool-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 10"></polyline></svg>
+              </div>
+              <div class="tool-details">
+                <h3>Guía de Puertos en Windows 11</h3>
+                <p>Asegúrate de que los puertos UDP <strong>16261</strong> y <strong>16262</strong> estén abiertos en el Firewall de Windows y en tu router (Port Forwarding).</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/api.js"></script>
+  <script src="js/websocket.js"></script>
+  <script src="js/console.js"></script>
+  <script src="js/configView.js"></script>
+  <script src="js/modView.js"></script>
+  <script src="js/fileEditor.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

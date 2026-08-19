@@ -1,0 +1,173 @@
+/* ==========================================================================
+   INTERACTIVE LIVE TERMINAL STYLES
+   ========================================================================== */
+
+.terminal-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 180px);
+  background: #020617;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--bg-card-border);
+  overflow: hidden;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+}
+
+.console-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.toggle-control input[type="checkbox"] {
+  accent-color: var(--cyan-500);
+}
+
+.input-search {
+  padding: 4px 10px !important;
+  font-size: 0.8rem !important;
+  width: 160px;
+}
+
+.terminal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #cbd5e1;
+  background: #020617;
+}
+
+/* Individual Log Line */
+.log-line {
+  display: flex;
+  gap: 10px;
+  word-break: break-all;
+  padding: 1px 0;
+}
+
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.log-time {
+  color: #475569;
+  font-size: 0.76rem;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.log-content {
+  flex: 1;
+  white-space: pre-wrap;
+}
+
+/* Log Types Colors */
+.log-line.log-stdout .log-content {
+  color: #e2e8f0;
+}
+
+.log-line.log-system .log-content {
+  color: var(--cyan-400);
+  font-weight: 600;
+}
+
+.log-line.log-steamcmd .log-content {
+  color: #38bdf8;
+}
+
+.log-line.log-success .log-content {
+  color: var(--emerald-400);
+  font-weight: 600;
+}
+
+.log-line.log-warn .log-content {
+  color: var(--amber-400);
+}
+
+.log-line.log-error .log-content,
+.log-line.log-stderr .log-content {
+  color: var(--crimson-400);
+}
+
+/* Terminal Quick Command Bar */
+.terminal-quick-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-x: auto;
+}
+
+.quick-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.btn-quick-cmd {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.btn-quick-cmd:hover {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.4);
+  color: #fff;
+}
+
+/* Terminal Command Input Bar */
+.terminal-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #090d16;
+  border-top: 1px solid var(--bg-card-border);
+}
+
+.prompt-symbol {
+  color: var(--emerald-400);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.terminal-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.terminal-input::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}

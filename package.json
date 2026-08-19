@@ -1,0 +1,25 @@
+{
+  "name": "pz-server-dashboard",
+  "version": "1.0.0",
+  "description": "Local Web Dashboard for Project Zomboid Build 42 Dedicated Server management on Windows 11",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "project-zomboid",
+    "b42",
+    "dedicated-server",
+    "dashboard",
+    "steamcmd",
+    "windows"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}
