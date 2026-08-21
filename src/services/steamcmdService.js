@@ -139,21 +139,20 @@ class SteamCmdService {
     // Build SteamCMD args
     const args = [
       '+force_install_dir', serverInstallDir,
-      '+login', 'anonymous'
+      '+login', 'anonymous',
+      '+app_update', String(appId).trim()
     ];
 
-    let appUpdateCmd = `+app_update ${appId}`;
     if (branch && branch.trim().length > 0) {
-      appUpdateCmd += ` -beta ${branch.trim()}`;
+      args.push('-beta', branch.trim());
       if (branchPassword && branchPassword.trim().length > 0) {
-        appUpdateCmd += ` -betapassword ${branchPassword.trim()}`;
+        args.push('-betapassword', branchPassword.trim());
       }
     }
     if (validate) {
-      appUpdateCmd += ' validate';
+      args.push('validate');
     }
 
-    args.push(appUpdateCmd);
     args.push('+quit');
 
     return new Promise((resolve, reject) => {

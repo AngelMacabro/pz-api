@@ -1,133 +1,245 @@
 /**
- * API Client for PZ Dedicated Server Dashboard
+ * API Client for PZ Dedicated Server Dashboard with Auth & RBAC Handling
  */
 const API = {
+  async fetchWithAuth(url, options = {}) {
+    const defaultHeaders = {
+      'Accept': 'application/json'
+    };
+
+    if (options.body && typeof options.body === 'string') {
+      defaultHeaders['Content-Type'] = 'application/json';
+    }
+
+    const config = {
+      credentials: 'include', // Always send and receive cookies
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...(options.headers || {})
+      }
+    };
+
+    try {
+      const res = await fetch(url, config);
+      const data = await res.json().catch(() => ({ success: false, error: 'Respuesta no válida del servidor' }));
+
+      // Handle 401 Unauthorized globally
+      if (res.status === 401) {
+        if (typeof authManager !== 'undefined') {
+          authManager.setUser(null);
+          // If not checking /api/auth/me, prompt login modal
+          if (!url.includes('/api/auth/me')) {
+            authManager.showLoginModal();
+            if (window.App && window.App.showToast) {
+              window.App.showToast('Sesión requerida o expirada. Por favor, inicia sesión.', 'warn');
+            }
+          }
+        }
+      }
+
+      // Handle 403 Forbidden globally
+      if (res.status === 403) {
+        if (window.App && window.App.showToast) {
+          window.App.showToast(data.error || 'Acceso denegado: permisos insuficientes para esta acción.', 'error');
+        }
+      }
+
+      return data;
+    } catch (err) {
+      console.error(`[API Error] ${options.method || 'GET'} ${url}:`, err);
+      throw err;
+    }
+  },
+
+  // --- AUTHENTICATION ---
+  async authMe() {
+    return this.fetchWithAuth('/api/auth/me');
+  },
+
+  async authLogin(username, password) {
+    return this.fetchWithAuth('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+  },
+
+  async authRegister(username, email, password) {
+    return this.fetchWithAuth('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, email, password })
+    });
+  },
+
+  async authLogout() {
+    return this.fetchWithAuth('/api/auth/logout', { method: 'POST' });
+  },
+
+  // --- USERS MANAGEMENT ---
+  async getUsers(limit = 50, offset = 0) {
+    return this.fetchWithAuth(`/api/users?limit=${limit}&offset=${offset}`);
+  },
+
+  async getUser(id) {
+    return this.fetchWithAuth(`/api/users/${id}`);
+  },
+
+  async createUser(userData) {
+    return this.fetchWithAuth('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+  },
+
+  async updateUser(id, userData) {
+    return this.fetchWithAuth(`/api/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(userData)
+    });
+  },
+
+  async deleteUser(id) {
+    return this.fetchWithAuth(`/api/users/${id}`, { method: 'DELETE' });
+  },
+
+  // --- ROLES & PERMISSIONS ---
+  async getRoles() {
+    return this.fetchWithAuth('/api/roles');
+  },
+
+  async getPermissions() {
+    return this.fetchWithAuth('/api/roles/permissions');
+  },
+
+  async createRole(roleData) {
+    return this.fetchWithAuth('/api/roles', {
+      method: 'POST',
+      body: JSON.stringify(roleData)
+    });
+  },
+
+  async updateRole(id, roleData) {
+    return this.fetchWithAuth(`/api/roles/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(roleData)
+    });
+  },
+
+  async deleteRole(id) {
+    return this.fetchWithAuth(`/api/roles/${id}`, { method: 'DELETE' });
+  },
+
+  // --- AUDIT LOGS ---
+  async getAuditLogs(limit = 100, offset = 0) {
+    return this.fetchWithAuth(`/api/audit-logs?limit=${limit}&offset=${offset}`);
+  },
+
+  // --- STATUS & METRICS ---
   async getStatus() {
-    const res = await fetch('/api/status');
-    return res.json();
+    return this.fetchWithAuth('/api/status');
   },
 
   async getSystemInfo() {
-    const res = await fetch('/api/system-info');
-    return res.json();
+    return this.fetchWithAuth('/api/system-info');
   },
 
+  // --- SERVER CONTROLS ---
   async startServer() {
-    const res = await fetch('/api/server/start', { method: 'POST' });
-    return res.json();
+    return this.fetchWithAuth('/api/server/start', { method: 'POST' });
   },
 
   async stopServer(force = false) {
-    const res = await fetch('/api/server/stop', {
+    return this.fetchWithAuth('/api/server/stop', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ force })
     });
-    return res.json();
   },
 
   async restartServer() {
-    const res = await fetch('/api/server/restart', { method: 'POST' });
-    return res.json();
+    return this.fetchWithAuth('/api/server/restart', { method: 'POST' });
   },
 
   async killServer() {
-    const res = await fetch('/api/server/kill', { method: 'POST' });
-    return res.json();
+    return this.fetchWithAuth('/api/server/kill', { method: 'POST' });
   },
 
   async sendCommand(command) {
-    const res = await fetch('/api/server/command', {
+    return this.fetchWithAuth('/api/server/command', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command })
     });
-    return res.json();
   },
 
+  // --- STEAMCMD ---
   async installServer() {
-    const res = await fetch('/api/server/install', { method: 'POST' });
-    return res.json();
+    return this.fetchWithAuth('/api/server/install', { method: 'POST' });
   },
 
   async updateServer() {
-    const res = await fetch('/api/server/update', { method: 'POST' });
-    return res.json();
+    return this.fetchWithAuth('/api/server/update', { method: 'POST' });
   },
 
   async cancelSteam() {
-    const res = await fetch('/api/server/cancel-steam', { method: 'POST' });
-    return res.json();
+    return this.fetchWithAuth('/api/server/cancel-steam', { method: 'POST' });
   },
 
+  // --- CONFIGURATION ---
   async getConfig() {
-    const res = await fetch('/api/config');
-    return res.json();
+    return this.fetchWithAuth('/api/config');
   },
 
   async saveConfig(configData) {
-    const res = await fetch('/api/config', {
+    return this.fetchWithAuth('/api/config', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(configData)
     });
-    return res.json();
   },
 
+  // --- MODS ---
   async getMods() {
-    const res = await fetch('/api/mods');
-    return res.json();
+    return this.fetchWithAuth('/api/mods');
   },
 
   async saveMods(workshopItems, mods) {
-    const res = await fetch('/api/mods', {
+    return this.fetchWithAuth('/api/mods', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ workshopItems, mods })
     });
-    return res.json();
   },
 
   async downloadAllMods() {
-    const res = await fetch('/api/mods/download-all', { method: 'POST' });
-    return res.json();
+    return this.fetchWithAuth('/api/mods/download-all', { method: 'POST' });
   },
 
   async parseModText(text) {
-    const res = await fetch('/api/mods/parse', {
+    return this.fetchWithAuth('/api/mods/parse', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
     });
-    return res.json();
   },
 
+  // --- RAW FILE EDITING ---
   async getFilesList() {
-    const res = await fetch('/api/files');
-    return res.json();
+    return this.fetchWithAuth('/api/files');
   },
 
   async readFile(filePath) {
-    const res = await fetch(`/api/files/read?path=${encodeURIComponent(filePath)}`);
-    return res.json();
+    return this.fetchWithAuth(`/api/files/read?path=${encodeURIComponent(filePath)}`);
   },
 
   async saveFile(filePath, content) {
-    const res = await fetch('/api/files/save', {
+    return this.fetchWithAuth('/api/files/save', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: filePath, content })
     });
-    return res.json();
   },
 
+  // --- LOGS ---
   async getLogs(limit = 500) {
-    const res = await fetch(`/api/logs?limit=${limit}`);
-    return res.json();
+    return this.fetchWithAuth(`/api/logs?limit=${limit}`);
   },
 
   async clearLogs() {
-    const res = await fetch('/api/logs', { method: 'DELETE' });
-    return res.json();
+    return this.fetchWithAuth('/api/logs', { method: 'DELETE' });
   }
 };

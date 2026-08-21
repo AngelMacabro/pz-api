@@ -228,7 +228,7 @@ class PzProcessService {
         `-Xmx${maxRam}`,
         ...parsedJvmArgs,
         '-Djava.library.path=natives/;./natives/;./natives/win64/;./',
-        '-cp', 'java/;java/projectzomboid.jar;./;projectzomboid.jar',
+        '-cp', 'java/*;java/;java/projectzomboid.jar;./;projectzomboid.jar;*',
         'zombie.network.GameServer',
         '-servername', serverName
       ];

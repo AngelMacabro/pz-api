@@ -1,93 +1,162 @@
-# 🧟 Project Zomboid Build 42 - Local Dedicated Server Dashboard
+# 🧟 Project Zomboid Build 42 - Local Dedicated Server Dashboard (con Auth & RBAC)
 
-Un panel de control web moderno, intuitivo y modular diseñado específicamente para **Windows 11** para instalar, configurar, iniciar, detener, reiniciar y administrar de forma 100% automatizada un servidor dedicado standalone de **Project Zomboid Build 42** con soporte completo para mods de Steam Workshop.
+Un panel de control web moderno, intuitivo y modular diseñado para **Windows 11** para instalar, configurar, iniciar, detener, reiniciar y administrar de forma 100% automatizada un servidor dedicado de **Project Zomboid Build 42**, ahora con un sistema completo de **Autenticación segura de usuarios y Autorización basada en roles (RBAC)**.
 
 ---
 
 ## 🚀 Características Principales
 
+- **Seguridad & Control de Acceso Basado en Roles (RBAC)**:
+  - Base de datos relacional SQLite embebida con sistema de migraciones automáticas.
+  - Hashing seguro de contraseñas con `bcryptjs` (salt rounds = 12).
+  - Sesiones seguras en el servidor con cookies `HttpOnly`, `SameSite` y flags configurables.
+  - Protección contra ataques de fuerza bruta (Rate Limiting en login y registro).
+  - Control granular de permisos con soporte de comodines jerárquicos (ej. `mods.*`, `*`).
+  - Validación de identidad y permisos tanto en llamadas REST (`/api/*`) como en el WebSocket (`/ws`).
+  - Registro de auditoría para rastrear acciones operativas y de seguridad.
+
 - **Dashboard Web Moderno y Responsive**:
   - Diseño Glassmorphism Dark Mode optimizado.
+  - Interfaz reactiva a permisos: oculta o desactiva botones y secciones no permitidas para el rol del usuario autenticado.
   - Indicadores de estado en tiempo real (*Detenido*, *Iniciando*, *En Ejecución*, *Deteniendo*, *Instalando*, *Actualizando*, *Error*).
   - Monitoreo en vivo de recursos del sistema (Uso de CPU, RAM total y RAM consumida por el proceso de Project Zomboid).
   - Acciones rápidas en cabecera: Iniciar, Detener de forma segura (`save` & `quit`), Reiniciar y Forzar Cierre.
+
+- **Gestión de Cuentas y Auditoría**:
+  - Panel visual de gestión de usuarios para administradores.
+  - Creación, modificación de roles/permisos, activación/desactivación y eliminación de usuarios.
+  - Protección activa para evitar eliminar o desactivar al último administrador del sistema.
+  - Visor en vivo de registros de auditoría de seguridad.
 
 - **Instalación y Actualización Automatizada**:
   - Descarga y configuración automática de **SteamCMD** portable si no está presente en el sistema.
   - Instalación y actualización con un solo clic del servidor dedicado de Project Zomboid (Steam App ID `380870`).
   - Soporte para ramas beta (ej. rama `unstable` de **Build 42** o rama pública).
-  - Barra de progreso interactiva con porcentaje y bytes descargados en tiempo real.
 
-- **Consola Interactiva en Vivo**:
-  - Transmisión continua de logs por WebSocket de baja latencia.
-  - Coloración por niveles de log (`stdout`, `stderr`, `system`, `steamcmd`, `warn`, `error`, `success`).
-  - Autoscroll conmutable, buscador y filtro de texto en tiempo real.
-  - Envío interactivo de comandos de consola del juego (`help`, `players`, `save`, `reloadoptions`, `servermsg`, etc.) con historial navegable (flechas ↑ / ↓) y botones de acceso rápido.
-  - Descarga directa del historial de logs en archivo de texto `.txt`.
-
-- **Gestión Integral de Configuración**:
-  - Ajuste visual del Nombre del Servidor, Nombre Público, Descripción, Límite de Jugadores y Contraseñas (Servidor y RCON Admin).
-  - Asignación de memoria RAM mínima (`-Xms`) y máxima (`-Xmx`).
-  - Configuración de puertos de red (`DefaultPort 16261 UDP`, `UDPPort 16262 UDP`, UPnP).
-  - Rutas personalizables para instalación, SteamCMD y directorio de datos (`-cachedir`).
-  - Persistencia local automática en `config/settings.json` y sincronización bidireccional con el archivo `<servidor>.ini`.
-
-- **Gestor de Mods de Steam Workshop**:
-  - Administración visual de IDs de Steam Workshop (`WorkshopItems`) y nombres de mods (`Mods`).
-  - **Importador inteligente**: Pega descripciones completas de la Workshop o colecciones y extrae automáticamente los IDs numéricos y nombres de mod.
-  - Sincronización instantánea con los archivos de configuración del servidor.
-
-- **Editor de Archivos en Vivo**:
-  - Editor de texto integrado en el navegador para modificar directamente `<servidor>.ini` y `<servidor>_SandboxVars.lua`.
-  - Creación automática de copias de seguridad (`.bak`) antes de cada guardado para prevenir pérdida de datos.
-
-- **100% Local y Sin Dependencias Externas**:
-  - Se ejecuta en `http://127.0.0.1:3000`.
-  - Sin Docker ni servicios en la nube requeridos.
+- **Consola Interactiva en Vivo & WebSocket Seguro**:
+  - Transmisión continua de logs por WebSocket autenticado.
+  - Envío interactivo de comandos de consola del juego (`help`, `players`, `save`, `reloadoptions`, etc.) sujeto a permisos RBAC (`server.command`).
 
 ---
 
-## 📋 Requisitos del Sistema
+## 🔒 Roles y Matriz de Permisos
 
-- **Sistema Operativo**: Windows 11 (o Windows 10 de 64 bits).
-- **Node.js**: Versión 18.x, 20.x o superior ([Descargar Node.js LTS](https://nodejs.org/)).
-- **Memoria RAM**: 8 GB de RAM mínimo recomendado (16 GB o más si juegas y hospedas en la misma PC con múltiples mods).
-- **Espacio en Disco**: ~10 GB libres para los archivos del servidor de Project Zomboid y mods.
+El sistema incluye 4 roles base preconfigurados:
+
+| Rol | Descripción | Permisos Principales |
+| :--- | :--- | :--- |
+| **`admin`** | Administrador con control total del sistema | `*` (Acceso completo sin restricciones) |
+| **`operator`** | Operador de infraestructura del servidor | `server.view`, `server.start`, `server.stop`, `server.restart`, `server.command`, `server.install`, `server.config.*`, `mods.*`, `files.*`, `logs.view` |
+| **`analyst`** | Analista de métricas y observabilidad | `server.view`, `logs.view` (Solo lectura de telemetría y logs) |
+| **`viewer`** | Visualizador básico | `server.view` (Solo lectura de estado general del servidor) |
+
+### Lista de Permisos Disponibles
+
+- `*`: Acceso total sin restricciones.
+- `server.view`: Ver estado y telemetría del servidor.
+- `server.start`: Iniciar el proceso del servidor.
+- `server.stop`: Detener o forzar el apagado del servidor.
+- `server.restart`: Reiniciar el servidor.
+- `server.command`: Enviar comandos por consola/RCON.
+- `server.install`: Instalar o actualizar con SteamCMD.
+- `server.config.read`: Leer configuración de PZ y dashboard.
+- `server.config.write`: Guardar cambios en la configuración.
+- `mods.view`: Ver mods y workshop items instalados.
+- `mods.manage`: Agregar, actualizar, parsear y remover mods.
+- `files.read`: Leer archivos `.ini`, `.lua` y sandbox.
+- `files.write`: Modificar archivos de configuración.
+- `logs.view`: Ver transmisión de logs en vivo.
+- `logs.clear`: Limpiar buffer de logs.
+- `users.view`: Listar y consultar usuarios del sistema.
+- `users.manage`: Crear, editar, activar/desactivar y borrar usuarios.
+- `roles.view`: Consultar roles y permisos.
+- `roles.manage`: Crear y editar roles personalizados.
+- `audit.view`: Consultar el registro de auditoría.
 
 ---
 
 ## ⚡ Inicio Rápido
 
-1. **Clonar o descargar** esta carpeta en tu equipo (ejemplo: `G:\pzserver`).
-2. Haz doble clic en el archivo:
-   ```cmd
-   start.bat
-   ```
-   *El script verificará e instalará automáticamente las dependencias si es la primera vez y abrirá el dashboard en tu navegador web en `http://127.0.0.1:3000`.*
+### 1. Instalación de Dependencias
+```bash
+npm install
+```
 
-3. **Desde el Dashboard**:
-   - Haz clic en **"Instalar Servidor"** para que SteamCMD descargue automáticamente los archivos del servidor dedicado de Project Zomboid Build 42.
-   - Ajusta tu configuración (Nombre del servidor, RAM, Mods) en la pestaña **"Configuración"** o **"Gestor de Mods"**.
-   - Haz clic en **"Iniciar"** para arrancar el servidor.
-   - Sigue el arranque en la **"Consola en Vivo"** hasta ver el mensaje `*** SERVER STARTED ****`.
+### 2. Crear el Usuario Administrador Inicial
+Ejecuta el script interactivo para crear tu primera cuenta de administrador:
+```bash
+npm run create-admin
+```
+*También puedes proporcionar credenciales mediante argumentos o variables de entorno:*
+```bash
+node scripts/create-admin.js --username admin --email admin@pzserver.local --password TuPasswordSeguro123!
+```
+
+### 3. Iniciar el Servidor
+```bash
+npm start
+```
+Abre tu navegador en `http://127.0.0.1:3000` e inicia sesión con las credenciales creadas.
 
 ---
 
-## 🌐 Configuración de Red y Puertos en Windows 11
+## ⚙️ Variables de Entorno (`.env`)
 
-Para que otros jugadores puedan unirse a tu servidor a través de Internet:
+Copia `.env.example` a `.env` si deseas personalizar la configuración:
 
-1. **Firewall de Windows**:
-   - Abre *Seguridad de Windows* -> *Firewall y protección de red* -> *Permitir que una aplicación se comunique a través de Firewall*.
-   - Permite el ejecutable `jre64\bin\java.exe` dentro de tu carpeta de servidor (`pz_dedicated_server`).
-   - O crea reglas de entrada para los siguientes puertos UDP:
-     - **16261 UDP** (Puerto principal del juego)
-     - **16262 UDP** (Puerto de conexión directa de clientes)
+```env
+# Puerto y Host del Dashboard
+PORT=3000
+HOST=127.0.0.1
 
-2. **Reenvío de Puertos en el Router (Port Forwarding)**:
-   - Accede al panel de administración de tu router.
-   - Redirige los puertos **16261 UDP** y **16262 UDP** hacia la dirección IP local de tu PC en Windows 11 (ej. `192.168.1.XX`).
-   - Si tu router soporta **UPnP**, el servidor intentará abrirlos automáticamente si `UPnP=true` está activo en la configuración.
+# Ubicación de la Base de Datos SQLite
+DB_PATH=data/dashboard.db
+
+# Configuración de Cookies
+COOKIE_SECURE=false
+
+# Tiempo de Expiración de Sesión (7 días en ms)
+SESSION_MAX_AGE_MS=604800000
+
+# Permitir Registro Público (true/false)
+# Si es false, solo los administradores pueden crear nuevos usuarios.
+ALLOW_REGISTRATION=false
+```
+
+---
+
+## 🧪 Pruebas Automatizadas
+
+El proyecto cuenta con una suite completa de pruebas unitarias que cubren hashing, autenticación, expiración de sesiones, permisos RBAC, soporte de comodines y garantías de seguridad:
+
+```bash
+npm test
+```
+
+---
+
+## 🛠️ Guía de Desarrollo: Cómo Proteger Nuevas Rutas
+
+Para proteger un nuevo endpoint en el backend, utiliza los middlewares disponibles en `src/middleware/authMiddleware.js`:
+
+```javascript
+const { requireAuth, requirePermission, requireRole } = require('../middleware/authMiddleware');
+
+// 1. Exigir solo autenticación
+router.get('/mi-ruta-privada', requireAuth, (req, res) => {
+  res.json({ user: req.user });
+});
+
+// 2. Exigir un permiso específico (Recomendado)
+router.post('/mi-accion', requirePermission('server.start'), (req, res) => {
+  // Solo ejecutado si el usuario tiene 'server.start' o '*'
+});
+
+// 3. Exigir un rol específico
+router.delete('/mi-recurso', requireRole('admin'), (req, res) => {
+  // Solo administradores
+});
+```
 
 ---
 
@@ -96,78 +165,68 @@ Para que otros jugadores puedan unirse a tu servidor a través de Internet:
 ```
 pzserver/
 ├── config/
-│   └── settings.json             # Configuración persistente del dashboard y servidor
+│   └── settings.json             # Configuración persistente del servidor PZ
+├── data/                         # Base de datos SQLite y datos locales
+│   └── dashboard.db
 ├── logs/                         # Registros diarios de servidor y SteamCMD
 ├── public/                       # Frontend SPA (HTML5, CSS3 Glassmorphism, JS)
 │   ├── css/
-│   │   ├── styles.css            # Sistema de diseño, layout responsive y dark mode
-│   │   └── terminal.css          # Estilos de la terminal y comandos
+│   │   ├── styles.css            # Sistema de diseño, layout responsive y estilos RBAC
+│   │   └── terminal.css          # Estilos de la terminal
 │   ├── js/
-│   │   ├── api.js                # Cliente REST API
+│   │   ├── api.js                # Cliente REST API con manejo de sesiones y 401/403
 │   │   ├── app.js                # Orquestador general de la aplicación
-│   │   ├── configView.js         # Controlador del formulario de configuración
-│   │   ├── console.js            # Controlador de la consola en tiempo real
+│   │   ├── auth.js               # Gestor de estado de autenticación y RBAC en cliente
+│   │   ├── configView.js         # Formulario de configuración
+│   │   ├── console.js            # Consola en tiempo real
 │   │   ├── fileEditor.js         # Editor de archivos .ini y scripts Lua
-│   │   ├── modView.js            # Controlador del gestor de mods
-│   │   └── websocket.js          # Cliente WebSocket en tiempo real
-│   └── index.html                # Interfaz de usuario principal
+│   │   ├── modView.js            # Gestor de mods
+│   │   ├── userManagement.js     # Panel de gestión de usuarios y auditoría
+│   │   └── websocket.js          # Cliente WebSocket autenticado
+│   └── index.html                # Interfaz de usuario con soporte RBAC
 ├── scripts/
+│   ├── create-admin.js           # CLI interactivo para crear o restablecer el admin inicial
 │   ├── install_dependencies.bat  # Script para instalar paquetes npm
-│   ├── run.ps1                   # Script para PowerShell 7 / Windows PowerShell
+│   ├── run.ps1                   # Script para PowerShell
 │   └── start_dashboard.bat       # Script principal de lanzamiento en Windows
 ├── src/
-│   ├── config/
-│   │   └── configManager.js      # Gestor de persistencia de configuración
+│   ├── db/
+│   │   ├── database.js           # Conector SQLite nativo y helpers transaccionales
+│   │   ├── migrator.js           # Ejecutor automático de migraciones SQL
+│   │   └── migrations/
+│   │       └── 001_initial_schema.sql # Esquema base y seeds
+│   ├── middleware/
+│   │   ├── authMiddleware.js     # Middlewares requireAuth, requirePermission, requireRole
+│   │   └── rateLimiter.js        # Limitador de tasa contra fuerza bruta
 │   ├── routes/
-│   │   └── api.js                # Definición de rutas y endpoints de la API REST
+│   │   ├── api.js                # Enrutador principal protegido con RBAC
+│   │   ├── authRoutes.js         # /api/auth/login, /register, /logout, /me
+│   │   ├── userRoutes.js         # /api/users CRUD
+│   │   ├── roleRoutes.js         # /api/roles y permisos
+│   │   └── auditRoutes.js        # /api/audit-logs
 │   ├── services/
+│   │   ├── authService.js        # Manejo de sesiones y tokens server-side
+│   │   ├── userService.js        # CRUD de usuarios y hashing de passwords
+│   │   ├── roleService.js        # Consulta y configuración de roles/permisos
+│   │   ├── auditService.js       # Registro estructurado de eventos auditables
 │   │   ├── logService.js         # Ring-buffer de logs y emisión WebSocket
 │   │   ├── modService.js         # Parser y gestor de Workshop y Mods
 │   │   ├── pzConfigService.js    # Parser bidireccional de .ini y SandboxVars.lua
-│   │   ├── pzProcessService.js   # Manejo de procesos Java, stdin/stdout y errores
-│   │   ├── steamcmdService.js    # Gestor y descargador automático de SteamCMD
+│   │   ├── pzProcessService.js   # Manejo de procesos Java
+│   │   ├── steamcmdService.js    # Gestor y descargador de SteamCMD
 │   │   └── systemService.js      # Monitoreo de recursos de Windows (CPU/RAM)
 │   └── websocket/
-│       └── wsHandler.js          # Servidor WebSocket y emisión de telemetría
+│       └── wsHandler.js          # Servidor WebSocket autenticado con control de acceso
+├── tests/
+│   ├── auth.test.js              # Tests de login, registro, sesiones y expiración
+│   ├── rbac.test.js              # Tests de matriz de permisos y comodines
+│   └── security.test.js          # Tests de sanitización y protección de admin
+├── .env.example                  # Plantilla de variables de entorno
 ├── package.json                  # Dependencias y scripts del proyecto
 ├── server.js                     # Servidor HTTP/WebSocket principal
-├── start.bat                     # Acceso directo de 1 clic para Windows 11
+├── start.bat                     # Acceso directo para Windows 11
 └── README.md                     # Documentación completa
 ```
-
----
-
-## 🧩 Gestión de Mods en Build 42
-
-En Project Zomboid, los mods requieren dos parámetros:
-1. **WorkshopItems**: Lista de IDs numéricos de Steam Workshop separados por punto y coma (ej. `2680473910;2460154811`).
-2. **Mods**: Lista de los nombres internos de los mods separados por punto y coma (ej. `TrueActionsDancing;AutoLoot`).
-
-El dashboard incluye:
-- **Importador Rápido**: Puedes copiar y pegar directamente el texto de la página del mod de Steam Workshop o la lista de mods compartida por tus amigos. El sistema detectará las líneas `Workshop ID: ...` y `Mod ID: ...` y las agregará a las listas correspondientes automáticamente.
-- **Sincronización Automática**: Al presionar **"Sincronizar y Guardar Mods"**, los valores se aplican inmediatamente a tu `<servidor>.ini` y a la configuración general.
-
----
-
-## 🛠️ Extensibilidad y Arquitectura Modular
-
-El backend está estructurado en servicios desacoplados bajo `src/services/`, facilitando expansiones futuras como:
-- **Múltiples perfiles de servidor**: Añadir selector de perfiles en `configManager.js` para cambiar rápidamente entre mundos PvE, PvP o Hardcore.
-- **Gestor de Backups automáticos**: Añadir un servicio que comprima la carpeta `%USERPROFILE%/Zomboid/Saves/Multiplayer/<servidor>` en archivos `.zip` programados.
-- **Lista blanca y administración de jugadores**: Integrar comandos `adduser`, `grantadmin`, `kick` y `ban` con una interfaz de usuarios conectada a SQLite / DB de Zomboid.
-
----
-
-## ❓ Solución de Problemas Frecuentes
-
-1. **Error: "OutOfMemoryError: Java heap space"**:
-   - Dirígete a la pestaña **Configuración** -> **Hardware, Memoria y Red** y aumenta la **RAM Máxima (-Xmx)** a `6144m` (6 GB) o `8192m` (8 GB) según la memoria de tu equipo.
-2. **Error: "Address already in use / BindException"**:
-   - Otro proceso o servidor anterior sigue utilizando los puertos `16261` o `16262`. Ve a la pestaña **Herramientas** y haz clic en **"Forzar Cierre de Emergencia"** para limpiar cualquier proceso Java huérfano.
-3. **SteamCMD se queda congelado o no descarga**:
-   - Verifica tu conexión a internet o haz clic en el botón **"Cancelar"** en el banner superior y reintenta la instalación/actualización.
-4. **Los jugadores no ven el servidor en la lista pública**:
-   - Asegúrate de haber reenviado los puertos UDP 16261 y 16262 en tu router y de que la opción `Public=true` esté activada en la configuración.
 
 ---
 

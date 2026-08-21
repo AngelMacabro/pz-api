@@ -81,6 +81,13 @@ class WsClient {
         }
         break;
 
+      case 'AUTH_REQUIRED':
+        console.warn('[WebSocket] Servidor requiere autenticación.');
+        if (typeof authManager !== 'undefined') {
+          authManager.showLoginModal();
+        }
+        break;
+
       case 'COMMAND_ERROR':
         if (window.App && window.App.showToast) {
           window.App.showToast(`Error de comando: ${payload.error}`, 'error');

@@ -7,6 +7,7 @@ class LogService {
     this.buffer = [];
     this.logDir = path.resolve(__dirname, '../../logs');
     this.subscribers = new Set();
+    this.writeStreams = new Map();
     this.ensureLogDir();
   }
 
@@ -23,6 +24,20 @@ class LogService {
   getTodayLogPath(prefix = 'server') {
     const dateStr = new Date().toISOString().split('T')[0];
     return path.join(this.logDir, `${prefix}_${dateStr}.log`);
+  }
+
+  getWriteStream(source) {
+    const logPath = this.getTodayLogPath(source);
+    if (!this.writeStreams.has(logPath)) {
+      this.ensureLogDir();
+      const stream = fs.createWriteStream(logPath, { flags: 'a', encoding: 'utf-8' });
+      stream.on('error', (err) => {
+        console.error(`[LogService] Stream error on ${logPath}:`, err.message);
+        this.writeStreams.delete(logPath);
+      });
+      this.writeStreams.set(logPath, stream);
+    }
+    return this.writeStreams.get(logPath);
   }
 
   addSubscriber(ws) {
@@ -45,7 +60,7 @@ class LogService {
       if (line.trim().length === 0 && lines.length > 1) continue;
 
       const logEntry = {
-        id: Date.now() + Math.random().toString(36).substr(2, 5),
+        id: Date.now() + Math.random().toString(36).substring(2, 7),
         timestamp: new Date().toISOString(),
         timeFormatted: new Date().toLocaleTimeString('es-ES', { hour12: false }),
         type, // 'stdout' | 'stderr' | 'system' | 'steamcmd' | 'error' | 'success' | 'warn'
@@ -59,7 +74,7 @@ class LogService {
         this.buffer.shift();
       }
 
-      // Write to persistent disk file
+      // Write to persistent disk file via sequential stream
       this.appendToFile(logEntry, source);
 
       // Broadcast to WebSocket clients
@@ -69,13 +84,11 @@ class LogService {
 
   appendToFile(entry, source) {
     try {
-      const file = this.getTodayLogPath(source);
-      const formatted = `[${entry.timeFormatted}] [${entry.type.toUpperCase()}] ${entry.message}\n`;
-      fs.appendFile(file, formatted, 'utf-8', (err) => {
-        if (err) {
-          // ignore disk write errors during busy cycles
-        }
-      });
+      const stream = this.getWriteStream(source);
+      if (stream && !stream.destroyed) {
+        const formatted = `[${entry.timeFormatted}] [${entry.type.toUpperCase()}] ${entry.message}\n`;
+        stream.write(formatted);
+      }
     } catch (err) {
       // ignore
     }

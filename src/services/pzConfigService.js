@@ -123,7 +123,30 @@ class PzConfigService {
     return merged;
   }
 
+  isPathAllowed(filePath) {
+    if (!filePath || typeof filePath !== 'string') return false;
+
+    const resolved = path.resolve(filePath);
+    const ext = path.extname(resolved).toLowerCase();
+    const allowedExts = ['.ini', '.lua', '.json', '.txt'];
+
+    if (!allowedExts.includes(ext)) {
+      return false;
+    }
+
+    const serverDir = path.resolve(this.getServerDir());
+    const configDir = path.resolve(configManager.configDir || path.resolve(__dirname, '../../config'));
+
+    const isInsideServerDir = resolved.startsWith(serverDir + path.sep) || resolved === serverDir;
+    const isInsideConfigDir = resolved.startsWith(configDir + path.sep) || resolved === configDir;
+
+    return isInsideServerDir || isInsideConfigDir;
+  }
+
   getRawFile(filePath) {
+    if (!this.isPathAllowed(filePath)) {
+      throw new Error(`Acceso denegado: la ruta no está permitida o no es un archivo de configuración válido (${filePath})`);
+    }
     if (!fs.existsSync(filePath)) {
       throw new Error(`El archivo no existe: ${filePath}`);
     }
@@ -131,6 +154,9 @@ class PzConfigService {
   }
 
   saveRawFile(filePath, content) {
+    if (!this.isPathAllowed(filePath)) {
+      throw new Error(`Acceso denegado: no se puede modificar un archivo fuera de los directorios permitidos (${filePath})`);
+    }
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });

@@ -1,5 +1,5 @@
 /**
- * Main Application Orchestrator
+ * Main Application Orchestrator with Auth & RBAC
  */
 class AppManager {
   constructor() {
@@ -8,22 +8,29 @@ class AppManager {
     this.init();
   }
 
-  init() {
+  async init() {
+    // Global reference for toast & controllers
+    window.App = this;
+
     this.initTabs();
     this.initActionButtons();
+    this.initAuthUI();
     this.initWebSocketListeners();
-
-    // Start WebSocket
-    wsClient.connect();
 
     // Controllers
     this.consoleCtrl = new ConsoleController();
     this.configCtrl = new ConfigViewController();
     this.modCtrl = new ModViewController();
     this.fileEditorCtrl = new FileEditorController();
+    this.userMgmtCtrl = new UserManagementController();
 
-    // Global reference for toast
-    window.App = this;
+    // Check user session
+    const isAuth = await authManager.init();
+    if (isAuth) {
+      wsClient.connect();
+    } else {
+      authManager.showLoginModal();
+    }
   }
 
   initTabs() {
@@ -48,6 +55,8 @@ class AppManager {
           this.modCtrl.loadMods();
         } else if (targetTabId === 'tab-config' && this.configCtrl) {
           this.configCtrl.loadConfig();
+        } else if (targetTabId === 'tab-users' && this.userMgmtCtrl) {
+          this.userMgmtCtrl.loadAll();
         }
       });
     });
@@ -57,6 +66,91 @@ class AppManager {
       btnGotoConsole.addEventListener('click', () => {
         const consoleNavBtn = document.querySelector('[data-tab="tab-console"]');
         if (consoleNavBtn) consoleNavBtn.click();
+      });
+    }
+  }
+
+  initAuthUI() {
+    // Guest Login Button
+    const btnGuestLogin = document.getElementById('btn-guest-login');
+    if (btnGuestLogin) {
+      btnGuestLogin.addEventListener('click', () => authManager.showLoginModal());
+    }
+
+    // User Logout Button
+    const btnLogout = document.getElementById('btn-user-logout');
+    if (btnLogout) {
+      btnLogout.addEventListener('click', () => authManager.logout());
+    }
+
+    // Auth Modal Tabs (Login vs Register)
+    const tabLoginBtn = document.getElementById('tab-btn-login');
+    const tabRegisterBtn = document.getElementById('tab-btn-register');
+    const formLogin = document.getElementById('form-login');
+    const formRegister = document.getElementById('form-register');
+
+    if (tabLoginBtn && tabRegisterBtn && formLogin && formRegister) {
+      tabLoginBtn.addEventListener('click', () => {
+        tabLoginBtn.classList.add('active');
+        tabRegisterBtn.classList.remove('active');
+        formLogin.classList.remove('hidden');
+        formRegister.classList.add('hidden');
+      });
+
+      tabRegisterBtn.addEventListener('click', () => {
+        tabRegisterBtn.classList.add('active');
+        tabLoginBtn.classList.remove('active');
+        formRegister.classList.remove('hidden');
+        formLogin.classList.add('hidden');
+      });
+    }
+
+    // Login Form Submit
+    if (formLogin) {
+      formLogin.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('input-login-username')?.value.trim();
+        const password = document.getElementById('input-login-password')?.value;
+        const errBox = document.getElementById('login-error-msg');
+
+        if (errBox) errBox.classList.add('hidden');
+
+        try {
+          await authManager.login(username, password);
+          authManager.hideLoginModal();
+          this.showToast(`¡Bienvenido, ${authManager.currentUser.username}!`, 'success');
+          wsClient.connect();
+        } catch (err) {
+          if (errBox) {
+            errBox.textContent = err.message || 'Error al iniciar sesión';
+            errBox.classList.remove('hidden');
+          }
+        }
+      });
+    }
+
+    // Register Form Submit
+    if (formRegister) {
+      formRegister.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('input-reg-username')?.value.trim();
+        const email = document.getElementById('input-reg-email')?.value.trim();
+        const password = document.getElementById('input-reg-password')?.value;
+        const errBox = document.getElementById('reg-error-msg');
+
+        if (errBox) errBox.classList.add('hidden');
+
+        try {
+          await authManager.register(username, email, password);
+          authManager.hideLoginModal();
+          this.showToast('Cuenta creada e iniciada exitosamente', 'success');
+          wsClient.connect();
+        } catch (err) {
+          if (errBox) {
+            errBox.textContent = err.message || 'Error al registrar usuario';
+            errBox.classList.remove('hidden');
+          }
+        }
       });
     }
   }
@@ -235,6 +329,20 @@ class AppManager {
       pidText.textContent = status.pid ? `PID: ${status.pid}` : 'PID: Inactivo';
     }
 
+    // Uptime Counter
+    const uptimeEl = document.getElementById('card-uptime-text');
+    if (uptimeEl) {
+      const uptimeSecs = status.uptime || 0;
+      if (uptimeSecs > 0 && state === 'running') {
+        const hrs = Math.floor(uptimeSecs / 3600).toString().padStart(2, '0');
+        const mins = Math.floor((uptimeSecs % 3600) / 60).toString().padStart(2, '0');
+        const secs = (uptimeSecs % 60).toString().padStart(2, '0');
+        uptimeEl.textContent = `${hrs}:${mins}:${secs}`;
+      } else {
+        uptimeEl.textContent = '00:00:00';
+      }
+    }
+
     // Error banner
     if (errorBanner && errorText) {
       if (status.lastError) {
@@ -250,50 +358,34 @@ class AppManager {
     const btnStop = document.getElementById('btn-quick-stop');
     const btnRestart = document.getElementById('btn-quick-restart');
 
-    if (btnStart) btnStart.disabled = (state === 'running' || state === 'starting' || state === 'installing' || state === 'updating');
-    if (btnStop) btnStop.disabled = (state === 'stopped' || state === 'stopping' || state === 'installing' || state === 'updating');
-    if (btnRestart) btnRestart.disabled = (state === 'stopped' || state === 'installing' || state === 'updating');
+    const isRunning = state === 'running';
+    const isStopped = state === 'stopped';
+    const isBusy = ['starting', 'stopping', 'installing', 'updating', 'downloading_steamcmd'].includes(state);
+
+    if (btnStart) btnStart.disabled = !isStopped;
+    if (btnStop) btnStop.disabled = !isRunning;
+    if (btnRestart) btnRestart.disabled = !isRunning;
 
     // Steam Banner
     const steamBanner = document.getElementById('steam-banner');
-    const steamTitle = document.getElementById('steam-banner-title');
     const steamStatus = document.getElementById('steam-banner-status');
     const steamProgress = document.getElementById('steam-banner-progress');
 
-    if (steamBanner && (state === 'installing' || state === 'updating' || state === 'downloading_steamcmd')) {
-      steamBanner.classList.remove('hidden');
-      if (status.steamProgress) {
-        if (steamTitle) steamTitle.textContent = label;
-        if (steamStatus) steamStatus.textContent = status.steamProgress.statusText || 'Procesando...';
-        if (steamProgress) steamProgress.style.width = `${status.steamProgress.percent || 0}%`;
+    if (['installing', 'updating', 'downloading_steamcmd'].includes(state)) {
+      if (steamBanner) steamBanner.classList.remove('hidden');
+      if (steamStatus) steamStatus.textContent = status.steamStatus || 'Procesando descarga de archivos...';
+      if (steamProgress && status.steamProgress) {
+        steamProgress.style.width = `${status.steamProgress}%`;
       }
-    } else if (steamBanner) {
-      steamBanner.classList.add('hidden');
+    } else {
+      if (steamBanner) steamBanner.classList.add('hidden');
     }
-
-    // Uptime formatting
-    this.updateUptimeUI(status.uptime);
-  }
-
-  updateUptimeUI(seconds) {
-    const uptimeEl = document.getElementById('card-uptime-text');
-    if (!uptimeEl) return;
-
-    if (!seconds || seconds <= 0) {
-      uptimeEl.textContent = '00:00:00';
-      return;
-    }
-
-    const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-    const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-    const s = String(seconds % 60).padStart(2, '0');
-    uptimeEl.textContent = `${h}:${m}:${s}`;
   }
 
   updateMetricsUI(metrics) {
     if (!metrics) return;
 
-    // CPU
+    // System CPU
     const cpuBar = document.getElementById('cpu-bar');
     const cpuVal = document.getElementById('cpu-val');
     if (cpuBar) cpuBar.style.width = `${metrics.cpuUsage || 0}%`;
